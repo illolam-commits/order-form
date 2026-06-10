@@ -44,7 +44,10 @@
 <script>
 const WHATSAPP_NUMBER = "14166669780"; // owner's WhatsApp (country code + number, digits only)
 const MAX_ITEMS = 20;
-const TYPES = ["Unisex T-shirt","Women T-shirt","Tank top","Sweatshirt","Hoodie"];
+const TYPES = ["Unisex T-shirt","Women T-shirt","Tank top","Sweatshirt","Hoodie","Cap"];
+const isCap = t => t==="Cap";
+// caps have no size and only one printing question
+const applicable = (f,t) => !(isCap(t) && (f.key==="size"||f.key==="back"));
 const SIZES = ["XS","S","M","L","XL","2XL"];
 const FIELDS = [
   {key:"type",  label:"Clothing",       q:i=>`🧥 Item ${i+1}: What clothing would you like?`, options:TYPES},
@@ -120,7 +123,10 @@ function askField(idx){
   fieldIdx = idx;
   const f = FIELDS[idx];
   const itemNo = mode==="edit" ? editItem : items.length;
-  addMsg(f.q(itemNo),"bot");
+  const t = mode==="edit" ? items[editItem].type : (cur ? cur.type : null);
+  let qText = f.q(itemNo);
+  if(isCap(t) && f.key==="front") qText = "🖨️ What would you like printed on the cap? (describe it, or tap None)";
+  addMsg(qText,"bot");
   if(f.options){
     showOptions(f.options.map(v=>({label:v, fn:()=>answer(v)})));
   } else {
@@ -129,13 +135,20 @@ function askField(idx){
 }
 function answer(v){
   if(mode==="edit"){
-    items[editItem][FIELDS[fieldIdx].key]=v;
+    const key=FIELDS[fieldIdx].key;
+    items[editItem][key]=v;
+    if(key==="type"){
+      if(isCap(v)){ items[editItem].size="—"; items[editItem].back="—"; }
+      else if(items[editItem].size==="—"){ addMsg("✅ Updated!","bot"); askField(1); return; }
+    }
     addMsg("✅ Updated!","bot");
     showSummary();
     return;
   }
   cur[FIELDS[fieldIdx].key]=v;
-  if(fieldIdx+1<FIELDS.length){ askField(fieldIdx+1); }
+  let next=fieldIdx+1;
+  while(next<FIELDS.length && !applicable(FIELDS[next], cur.type)){ cur[FIELDS[next].key]="—"; next++; }
+  if(next<FIELDS.length){ askField(next); }
   else{
     items.push(cur); cur=null;
     if(items.length>=MAX_ITEMS){
@@ -157,12 +170,18 @@ function startItem(){
 function summaryHTML(){
   let h=`<b>🛹 YOUR ORDER — ${items.length} item${items.length>1?"s":""}</b><br><br>`;
   items.forEach((it,i)=>{
-    h+=`<b>Item ${i+1}: ${esc(it.type)}</b><br>`+
-       `&nbsp;&nbsp;Size: ${esc(it.size)}<br>`+
-       `&nbsp;&nbsp;Color: ${esc(it.color)}<br>`+
-       `&nbsp;&nbsp;Front: ${esc(it.front)}<br>`+
-       `&nbsp;&nbsp;Back: ${esc(it.back)}<br>`+
-       `&nbsp;&nbsp;Note: ${esc(it.note)}<br><br>`;
+    h+=`<b>Item ${i+1}: ${esc(it.type)}</b><br>`;
+    if(isCap(it.type)){
+      h+=`&nbsp;&nbsp;Color: ${esc(it.color)}<br>`+
+         `&nbsp;&nbsp;Printing: ${esc(it.front)}<br>`+
+         `&nbsp;&nbsp;Note: ${esc(it.note)}<br><br>`;
+    } else {
+      h+=`&nbsp;&nbsp;Size: ${esc(it.size)}<br>`+
+         `&nbsp;&nbsp;Color: ${esc(it.color)}<br>`+
+         `&nbsp;&nbsp;Front: ${esc(it.front)}<br>`+
+         `&nbsp;&nbsp;Back: ${esc(it.back)}<br>`+
+         `&nbsp;&nbsp;Note: ${esc(it.note)}<br><br>`;
+    }
   });
   return h;
 }
@@ -181,14 +200,15 @@ function showSummary(){
 }
 function chooseItemToFix(){
   addMsg("Which item do you want to change?","bot");
-  const opts=items.map((it,i)=>({label:`Item ${i+1}: ${it.type} (${it.size})`, fn:()=>chooseField(i)}));
+  const opts=items.map((it,i)=>({label:`Item ${i+1}: ${it.type}${isCap(it.type)?"":" ("+it.size+")"}`, fn:()=>chooseField(i)}));
   opts.push({label:"↩️ Back to order", fn:showSummary});
   showOptions(opts);
 }
 function chooseField(i){
   editItem=i;
   addMsg(`What do you want to change on Item ${i+1}?`,"bot");
-  const opts=FIELDS.map((f,fi)=>({label:f.label, fn:()=>{ mode="edit"; askField(fi); }}));
+  const opts=FIELDS.map((f,fi)=>({f,fi})).filter(x=>applicable(x.f, items[i].type))
+    .map(x=>({label:(isCap(items[i].type)&&x.f.key==="front")?"Printing":x.f.label, fn:()=>{ mode="edit"; askField(x.fi); }}));
   opts.push({label:"🗑 Remove this item", warn:true, fn:()=>{
     items.splice(i,1);
     addMsg("Item removed.","bot");
@@ -201,7 +221,11 @@ function orderText(){
   const d=new Date();
   let t=`🛹 SKATE ADDICT — ORDER\nDate: ${d.toLocaleDateString()}\n`;
   items.forEach((it,i)=>{
-    t+=`\nItem ${i+1}: ${it.type}\n• Size: ${it.size}\n• Color: ${it.color}\n• Front printing: ${it.front}\n• Back printing: ${it.back}\n• Note: ${it.note}\n`;
+    if(isCap(it.type)){
+      t+=`\nItem ${i+1}: ${it.type}\n• Color: ${it.color}\n• Printing: ${it.front}\n• Note: ${it.note}\n`;
+    } else {
+      t+=`\nItem ${i+1}: ${it.type}\n• Size: ${it.size}\n• Color: ${it.color}\n• Front printing: ${it.front}\n• Back printing: ${it.back}\n• Note: ${it.note}\n`;
+    }
   });
   t+=`\nTotal items: ${items.length}\n✅ Confirmed by customer`;
   return t;
