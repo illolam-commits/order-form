@@ -72,7 +72,12 @@ function addMsg(text, cls){
   d.className = "msg " + cls;
   if(cls==="summary"){ d.innerHTML = text; } else { d.textContent = text; }
   chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
+  scrollBottom();
+}
+function scrollBottom(){
+  requestAnimationFrame(()=>{ chat.scrollTop = chat.scrollHeight; });
+  setTimeout(()=>{ chat.scrollTop = chat.scrollHeight; }, 150);
+  setTimeout(()=>{ chat.scrollTop = chat.scrollHeight; }, 400);
 }
 function clearControls(){ optionsEl.innerHTML=""; inputBar.style.display="none"; inputHandler=null; }
 function showOptions(list){
@@ -84,6 +89,7 @@ function showOptions(list){
     b.onclick=()=>{ addMsg(o.label,"user"); clearControls(); o.fn(); };
     optionsEl.appendChild(b);
   });
+  scrollBottom();
 }
 function showInput(allowNone, fn){
   clearControls();
@@ -96,7 +102,11 @@ function showInput(allowNone, fn){
   inputBar.style.display="flex";
   inputHandler=fn;
   setTimeout(()=>textInput.focus(),100);
+  scrollBottom();
 }
+// keep last message visible when the phone keyboard opens/closes
+textInput.addEventListener("focus", scrollBottom);
+if(window.visualViewport){ visualViewport.addEventListener("resize", scrollBottom); }
 inputBar.addEventListener("submit",e=>{
   e.preventDefault();
   const v=textInput.value.trim();
