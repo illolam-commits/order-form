@@ -55,8 +55,11 @@ const FIELDS = [
   {key:"color", label:"Color",          q:i=>`🎨 What clothing color? (type it in)`, input:true},
   {key:"front", label:"Front printing", q:i=>`🖨️ Front printing? (describe it, or tap None)`, input:true, none:true},
   {key:"back",  label:"Back printing",  q:i=>`🖨️ Back printing? (describe it, or tap None)`, input:true, none:true},
+  {key:"file",  label:"Design image",   q:i=>`📎 Do you have a design image for this item?`, options:["Yes — I'll attach it in WhatsApp","No"]},
   {key:"note",  label:"Note",           q:i=>`📝 Any note for this item? (or tap None)`, input:true, none:true},
 ];
+const hasFile = it => it.file && it.file.startsWith("Yes");
+const fileTxt = it => hasFile(it) ? "Yes — will attach in WhatsApp" : "—";
 
 let items = [];        // each: {type,size,color,front,back,note}
 let cur = null;        // item being filled
@@ -174,12 +177,14 @@ function summaryHTML(){
     if(isCap(it.type)){
       h+=`&nbsp;&nbsp;Color: ${esc(it.color)}<br>`+
          `&nbsp;&nbsp;Printing: ${esc(it.front)}<br>`+
+         `&nbsp;&nbsp;Design image: ${fileTxt(it)}<br>`+
          `&nbsp;&nbsp;Note: ${esc(it.note)}<br><br>`;
     } else {
       h+=`&nbsp;&nbsp;Size: ${esc(it.size)}<br>`+
          `&nbsp;&nbsp;Color: ${esc(it.color)}<br>`+
          `&nbsp;&nbsp;Front: ${esc(it.front)}<br>`+
          `&nbsp;&nbsp;Back: ${esc(it.back)}<br>`+
+         `&nbsp;&nbsp;Design image: ${fileTxt(it)}<br>`+
          `&nbsp;&nbsp;Note: ${esc(it.note)}<br><br>`;
     }
   });
@@ -222,16 +227,18 @@ function orderText(){
   let t=`🛹 SKATE ADDICT — ORDER\nDate: ${d.toLocaleDateString()}\n`;
   items.forEach((it,i)=>{
     if(isCap(it.type)){
-      t+=`\nItem ${i+1}: ${it.type}\n• Color: ${it.color}\n• Printing: ${it.front}\n• Note: ${it.note}\n`;
+      t+=`\nItem ${i+1}: ${it.type}\n• Color: ${it.color}\n• Printing: ${it.front}\n• Design image: ${fileTxt(it)}\n• Note: ${it.note}\n`;
     } else {
-      t+=`\nItem ${i+1}: ${it.type}\n• Size: ${it.size}\n• Color: ${it.color}\n• Front printing: ${it.front}\n• Back printing: ${it.back}\n• Note: ${it.note}\n`;
+      t+=`\nItem ${i+1}: ${it.type}\n• Size: ${it.size}\n• Color: ${it.color}\n• Front printing: ${it.front}\n• Back printing: ${it.back}\n• Design image: ${fileTxt(it)}\n• Note: ${it.note}\n`;
     }
   });
   t+=`\nTotal items: ${items.length}\n✅ Confirmed by customer`;
+  if(items.some(hasFile)) t+=`\n📎 Design image(s) attached in this chat`;
   return t;
 }
 function sendOrder(){
   addMsg("🎉 Awesome! Opening WhatsApp — just tap Send to deliver your order. Thank you! 🛹","bot");
+  if(items.some(hasFile)) addMsg("📎 Important: after sending the order text, please attach your design image(s) in the same WhatsApp chat!","bot");
   const url=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(orderText())}`;
   showOptions([{label:"📲 Open WhatsApp & send", fn:()=>{
     window.open(url,"_blank");
